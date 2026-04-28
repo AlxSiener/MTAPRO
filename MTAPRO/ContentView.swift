@@ -10,10 +10,14 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         VStack {
-            Image(systemName: "globe")
+            HStack{
+                Image(systemName: "train.side.rear.car")
+                Image(systemName: "train.side.middle.car")
+                Image(systemName: "train.side.front.car")
+            }
                 .imageScale(.large)
                 .foregroundStyle(.tint)
-            Text("Hello, world!")
+            Text("MTA PRO APP")
         }
         .padding()
     }
