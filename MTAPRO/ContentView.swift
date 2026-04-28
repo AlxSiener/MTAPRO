@@ -8,16 +8,31 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var trainOn: Bool = false
     var body: some View {
         VStack {
-            HStack{
-                Image(systemName: "train.side.rear.car")
-                Image(systemName: "train.side.middle.car")
-                Image(systemName: "train.side.front.car")
-            }
-                .imageScale(.large)
+            if (trainOn) {
+                HStack{
+                    Image(systemName: "train.side.rear.car")
+                    Image(systemName: "train.side.middle.car")
+                    Image(systemName: "train.side.front.car")
+                }
+                .font(.largeTitle)
                 .foregroundStyle(.tint)
+            }
+           
+                
             Text("MTA PRO APP")
+                .font(Font.largeTitle)
+            Button("PUSH"){
+                withAnimation(.linear(duration: 0.2)){
+                    trainOn = !trainOn
+                }
+                    
+                
+
+                
+            }
         }
         .padding()
     }
