@@ -31,7 +31,7 @@ class TrainLine: Identifiable {
     }
 }
 
-class Stations: Identifiable {
+class Station: Identifiable {
     var name: String
     var line: TrainLineType
     var stopNumber: Int

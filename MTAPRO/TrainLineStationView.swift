@@ -8,13 +8,14 @@
 import SwiftUI
 
 struct TrainLineStationView: View {
-    let trainLine: TrainLine
+    let trainLine: TrainLineType
+    let stations: [Station] = []
     
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+        Text("\(trainLine)")
     }
 }
 
 #Preview {
-    TrainLineStationView()
+    TrainLineStationView(trainLine: .G)
 }
