@@ -5,10 +5,13 @@
 //  Created by Student on 4/29/26.
 //
 
-class Train {
+import Foundation
+
+class Train: Identifiable {
     var name: Character
     var trainLine: String
     var direction: String
+    var id = UUID()
     
     init(name: Character, trainLine: String, direction: String) {
         self.name = name
@@ -17,7 +20,30 @@ class Train {
     }
 }
 
-enum TrainLine {
+class TrainLine: Identifiable {
+    var name: String
+    var id: UUID = UUID()
+    var line: TrainLineType
+    
+    init(name: String, line: TrainLineType) {
+        self.name = name
+        self.line = line
+    }
+}
+
+class Stations: Identifiable {
+    var name: String
+    var line: TrainLineType
+    var stopNumber: Int
+    
+    init(name: String, line: TrainLineType, stopNumber: Int) {
+        self.name = name
+        self.line = line
+        self.stopNumber = stopNumber
+    }
+}
+
+enum TrainLineType {
     case A
     case C
     case E
@@ -29,6 +55,8 @@ enum TrainLine {
     case R
     case Q
     case W
+    case J
+    case Z
     case one
     case two
     case three
