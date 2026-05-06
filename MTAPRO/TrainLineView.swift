@@ -23,11 +23,7 @@ struct TrainLineView: View {
                     Text("\(trainLine.name)")
                 }
             }
-            .onTapGesture {
-                
-            }
         }
-        
     }
 }
 
