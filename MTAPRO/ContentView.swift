@@ -18,36 +18,34 @@ struct ContentView: View {
             
             TrainLineView()
             
-            
-            
-            
-            
-            //                if (trainOn) {
-            //                    HStack{
-            //                        Image(systemName: "train.side.rear.car")
-            //                        Image(systemName: "train.side.middle.car")
-            //                        Image(systemName: "train.side.front.car")
-            //                    }
-            //                    .font(.largeTitle)
-            //                    .foregroundStyle(.tint)
-            //                }
-            //                
-            //                
-            //                Text("MTA PRO APP")
-            //                    .font(Font.largeTitle)
-            //                Button("PUSH"){
-            //                    withAnimation(.linear(duration: 0.2)){
-            //                        trainOn = !trainOn
-            //                    }
-            //                    
-            //                    
-            //                }
-            //            }
-            //            .padding()
+        
+                            if (trainOn) {
+                                HStack{
+                                    Image(systemName: "train.side.rear.car")
+                                    Image(systemName: "train.side.middle.car")
+                                    Image(systemName: "train.side.front.car")
+                                }
+                                .transition(.move(edge: .leading))
+                                .font(.largeTitle)
+                                .foregroundStyle(.tint)
+                            }
+                            
+                            
+                            Text("MTA PRO APP")
+                                .font(Font.largeTitle)
+                            Button("PUSH"){
+                                withAnimation(.easeOut(duration: 1.2)){
+                                    trainOn = !trainOn
+                                }
+                                
+                                
+                            }
+                        }
+                        .padding()
         }
     
     }
-}
+
 #Preview {
     ContentView()
         .environment(TrainNetworkClient())
