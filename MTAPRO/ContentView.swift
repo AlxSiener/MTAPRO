@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @Environment(TrainNetworkClient.self) private var client
+   // @Environment(TrainNetworkClient.self) private var client
     @State private var trainOn: Bool = false
     var body: some View {
     
@@ -47,6 +47,8 @@ struct ContentView: View {
     }
 
 #Preview {
-    ContentView()
-        .environment(TrainNetworkClient())
+    NavigationStack {
+        ContentView()
+    }
+       // .environment(TrainNetworkClient())
 }
