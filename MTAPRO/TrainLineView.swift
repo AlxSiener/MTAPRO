@@ -14,14 +14,28 @@ struct TrainLineView: View {
         TrainLine(name: "J", line: .J)
     ]
     var body: some View {
-        List {
-            ForEach(trainlines) {trainLine in
-                NavigationLink {
-                    TrainLineStationView(trainLine: trainLine.line)
-                } label: {
-                    Image(systemName: "flag")
-                    Text("\(trainLine.name)")
+        ZStack {
+            Color("Background")
+                .ignoresSafeArea()
+            
+            ScrollView {
+                LazyVGrid(columns: [
+                    GridItem(), GridItem()
+                ], spacing: 20) {
+                    ForEach(trainlines) {trainLine in
+                        NavigationLink {
+                            TrainLineStationView(trainLine: trainLine.line)
+                        } label: {
+                            Image(systemName: "flag")
+                            Text("\(trainLine.name)")
+                        }
+                        .padding()
+                        .background(Color("ElementColor"))
+                        .clipShape(RoundedRectangle(cornerRadius: 15))
+                        .shadow(color: .blue.opacity(0.2), radius: 8, y: 4)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
