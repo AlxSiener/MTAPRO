@@ -234,6 +234,9 @@ struct TestView: View {
                 }
             }
             
+           // try to sort by train station
+//            ForEach()
+            
             // Trains by Direction
             if !groupedByDirection.isEmpty {
                 ForEach(Array(groupedByDirection.keys.sorted()), id: \.self) { direction in
@@ -258,6 +261,8 @@ struct TestView: View {
                                 .font(.system(.caption, design: .monospaced))
                             Text("Direction: \(train.direction)")
                                 .font(.system(.caption, design: .monospaced))
+//                            Text("Station: \(train.time)")
+//                                .font(.system(.caption, design: .monospaced))
                         }
                         .foregroundStyle(.secondary)
                     }
