@@ -12,7 +12,7 @@ struct MTAPROApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationStack {
-                ContentView()
+                TestView()
             }
         }
     }
