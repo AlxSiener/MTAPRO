@@ -6,11 +6,20 @@
 //
 
 import SwiftUI
+import SwiftProtobuf
 
 struct TestView: View {
     @Environment(TrainNetworkClient.self) private var client
     @State private var selectedFeed: String = "g"
     @State private var showRawData: Bool = false
+    @State private var viewMode: ViewMode = .byDirection
+    @State private var stationArrivals: [StationArrival] = []
+    @State private var isLoadingStations = false
+    
+    enum ViewMode: String, CaseIterable {
+        case byDirection = "By Direction"
+        case byStation = "By Station"
+    }
     
     var body: some View {
         NavigationStack {
@@ -22,14 +31,20 @@ struct TestView: View {
                 statusBar
                 
                 // Main Content
-                if client.isLoading {
+                if client.isLoading || isLoadingStations {
                     loadingView
                 } else if let error = client.errorMessage {
                     errorView(error)
-                } else if client.trains.isEmpty {
+                } else if viewMode == .byDirection && client.trains.isEmpty {
+                    emptyStateView
+                } else if viewMode == .byStation && stationArrivals.isEmpty {
                     emptyStateView
                 } else {
-                    trainListView
+                    if viewMode == .byDirection {
+                        trainListView
+                    } else {
+                        stationArrivalView
+                    }
                 }
             }
             .navigationTitle("🚇 GTFS Test View")
@@ -63,6 +78,27 @@ struct TestView: View {
     
     private var controlPanel: some View {
         VStack(spacing: 12) {
+            // View Mode Selector
+            VStack(alignment: .leading, spacing: 4) {
+                Text("View Mode")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Picker("View Mode", selection: $viewMode) {
+                    ForEach(ViewMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: viewMode) { oldValue, newValue in
+                    if newValue == .byStation && stationArrivals.isEmpty {
+                        Task {
+                            await loadStationArrivals()
+                        }
+                    }
+                }
+            }
+            
             // Feed Selector
             VStack(alignment: .leading, spacing: 4) {
                 Text("Select Feed")
@@ -88,14 +124,14 @@ struct TestView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(client.isLoading)
+                .disabled(client.isLoading || isLoadingStations)
                 
                 Button(action: fetchAllFeeds) {
                     Label("Fetch All", systemImage: "square.stack.3d.down.right.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .disabled(client.isLoading)
+                .disabled(client.isLoading || isLoadingStations)
             }
         }
         .padding()
@@ -234,9 +270,6 @@ struct TestView: View {
                 }
             }
             
-           // try to sort by train station
-//            ForEach()
-            
             // Trains by Direction
             if !groupedByDirection.isEmpty {
                 ForEach(Array(groupedByDirection.keys.sorted()), id: \.self) { direction in
@@ -261,10 +294,99 @@ struct TestView: View {
                                 .font(.system(.caption, design: .monospaced))
                             Text("Direction: \(train.direction)")
                                 .font(.system(.caption, design: .monospaced))
-//                            Text("Station: \(train.time)")
-//                                .font(.system(.caption, design: .monospaced))
                         }
                         .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+    
+    // MARK: - Station Arrival View
+    
+    private var stationArrivalView: some View {
+        List {
+            // Summary Section
+            Section("Summary") {
+                HStack {
+                    Text("Total Stations")
+                    Spacer()
+                    Text("\(stationArrivals.count)")
+                        .fontWeight(.bold)
+                }
+                
+                HStack {
+                    Text("Feed ID")
+                    Spacer()
+                    Text(selectedFeed)
+                        .fontWeight(.bold)
+                        .font(.system(.body, design: .monospaced))
+                }
+                
+                if let lastUpdated = client.lastUpdated {
+                    HStack {
+                        Text("Last Updated")
+                        Spacer()
+                        Text(lastUpdated.formatted())
+                            .font(.caption)
+                    }
+                }
+            }
+            
+            // Stations with Arrivals
+            ForEach(stationArrivals) { stationArrival in
+                Section {
+                    // Station Header
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(stationArrival.stationName)
+                            .font(.headline)
+                        Text(stationArrival.stopID)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .font(.system(.caption, design: .monospaced))
+                    }
+                    .padding(.vertical, 4)
+                    
+                    // Group arrivals by direction
+                    let groupedArrivals = Dictionary(grouping: stationArrival.arrivals) { $0.direction }
+                    let directions = groupedArrivals.keys.sorted()
+                    
+                    ForEach(directions, id: \.self) { direction in
+                        // Direction Header
+                        HStack {
+                            Image(systemName: direction == "Northbound" ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
+                                .foregroundStyle(direction == "Northbound" ? .blue : .orange)
+                            Text(direction)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text("\(groupedArrivals[direction]?.count ?? 0) trains")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                        
+                        // Show up to 3 closest trains per direction
+                        if let directionalArrivals = groupedArrivals[direction] {
+                            ForEach(Array(directionalArrivals.prefix(3).enumerated()), id: \.element.id) { index, arrival in
+                                StationArrivalRow(arrival: arrival, position: index + 1)
+                            }
+                            
+                            if directionalArrivals.count > 3 {
+                                Text("+ \(directionalArrivals.count - 3) more")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.vertical, 4)
+                            }
+                        }
+                        
+                        // Add divider between directions (if not the last one)
+                        if direction != directions.last {
+                            Divider()
+                                .padding(.vertical, 4)
+                        }
                     }
                 }
             }
@@ -283,12 +405,18 @@ struct TestView: View {
     private func refreshData() {
         Task {
             await client.fetchTrainData(for: selectedFeed)
+            if viewMode == .byStation {
+                await loadStationArrivals()
+            }
         }
     }
     
     private func fetchAllFeeds() {
         Task {
             await client.fetchTrainData(for: ["g", "l", "ace", "bdfm", "nqrw", "jz", "1234567"])
+            if viewMode == .byStation {
+                await loadStationArrivals()
+            }
         }
     }
     
@@ -297,7 +425,111 @@ struct TestView: View {
             client.trains = []
             client.lastUpdated = nil
             client.errorMessage = nil
+            stationArrivals = []
         }
+    }
+    
+    private func loadStationArrivals() async {
+        isLoadingStations = true
+        
+        do {
+            let data = try await client.fetchRawGTFSData(for: selectedFeed)
+            let feedMessage = try TransitRealtime_FeedMessage(serializedBytes: data)
+            
+            // Dictionary to group trains by base station (without direction suffix)
+            var stationMap: [String: [TrainArrivalInfo]] = [:]
+            
+            // Process each trip update
+            for entity in feedMessage.entity {
+                guard entity.hasTripUpdate else { continue }
+                
+                let tripUpdate = entity.tripUpdate
+                guard tripUpdate.hasTrip else { continue }
+                
+                let trip = tripUpdate.trip
+                guard trip.hasRouteID else { continue }
+                
+                let routeID = trip.routeID
+                
+                // Process each stop for this trip
+                for stopTimeUpdate in tripUpdate.stopTimeUpdate {
+                    guard stopTimeUpdate.hasStopID else { continue }
+                    
+                    let stopID = stopTimeUpdate.stopID
+                    
+                    // Determine direction from stop ID suffix (N/S) or trip direction
+                    let direction: String
+                    if stopID.hasSuffix("N") {
+                        direction = "Northbound"
+                    } else if stopID.hasSuffix("S") {
+                        direction = "Southbound"
+                    } else if trip.hasDirectionID {
+                        direction = trip.directionID == 0 ? "Northbound" : "Southbound"
+                    } else {
+                        direction = "Unknown"
+                    }
+                    
+                    // Get the base stop ID (without N/S suffix)
+                    let baseStopID = stopID.hasSuffix("N") || stopID.hasSuffix("S")
+                        ? String(stopID.dropLast())
+                        : stopID
+                    
+                    // Get arrival time
+                    var arrivalTime: Date? = nil
+                    var delay: Int? = nil
+                    
+                    if stopTimeUpdate.hasArrival {
+                        let arrival = stopTimeUpdate.arrival
+                        if arrival.hasTime {
+                            arrivalTime = Date(timeIntervalSince1970: TimeInterval(arrival.time))
+                        }
+                        if arrival.hasDelay {
+                            delay = Int(arrival.delay)
+                        }
+                    }
+                    
+                    // Only include future arrivals within the next 60 minutes (closest trains)
+                    guard let arrivalTime = arrivalTime,
+                          arrivalTime > Date(),
+                          arrivalTime.timeIntervalSinceNow <= 3600 else { continue }
+                    
+                    let trainInfo = TrainArrivalInfo(
+                        trainLine: routeID,
+                        direction: direction,
+                        arrivalTime: arrivalTime,
+                        delay: delay
+                    )
+                    
+                    if stationMap[baseStopID] == nil {
+                        stationMap[baseStopID] = []
+                    }
+                    stationMap[baseStopID]?.append(trainInfo)
+                }
+            }
+            
+            // Convert to StationArrival objects and sort
+            await MainActor.run {
+                self.stationArrivals = stationMap.compactMap { stopID, trains in
+                    // Only include stations that have arrivals
+                    guard !trains.isEmpty else { return nil }
+                    
+                    // Sort trains by arrival time (closest first)
+                    let sortedTrains = trains.sorted { $0.arrivalTime < $1.arrivalTime }
+                    
+                    return StationArrival(
+                        stopID: stopID,
+                        stationName: StationNameMapper.name(for: stopID),
+                        arrivals: sortedTrains
+                    )
+                }
+                // Sort stations alphabetically by name
+                .sorted { $0.stationName < $1.stationName }
+            }
+        } catch {
+            print("Error loading station arrivals: \(error)")
+        }
+        
+        isLoadingStations = false
     }
 }
 
@@ -373,6 +605,211 @@ struct TrainRow: View {
     }
 }
 
+// MARK: - Station Arrival Row
+
+struct StationArrivalRow: View {
+    let arrival: TrainArrivalInfo
+    let position: Int
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Position Badge
+            ZStack {
+                Circle()
+                    .fill(badgeColor)
+                    .frame(width: 32, height: 32)
+                
+                Text("\(position)")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+            }
+            
+            // Train Badge
+            Circle()
+                .fill(trainColor)
+                .frame(width: 40, height: 40)
+                .overlay {
+                    Text(arrival.trainLine)
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
+            
+            // Train Info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(TrainNetworkClient.displayName(for: arrival.trainLine))
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                HStack(spacing: 4) {
+                    if let delay = arrival.delay, delay > 0 {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                        Text("\(delay/60) min delay")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                        Text("On time")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Arrival Time
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(arrivalCountdown)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(timeColor)
+                
+                Text(arrival.arrivalTime.formatted(date: .omitted, time: .shortened))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+    
+    private var arrivalCountdown: String {
+        let timeInterval = arrival.arrivalTime.timeIntervalSinceNow
+        if timeInterval < 60 {
+            return "Arriving"
+        } else {
+            let minutes = Int(timeInterval / 60)
+            return "\(minutes) min"
+        }
+    }
+    
+    private var timeColor: Color {
+        let timeInterval = arrival.arrivalTime.timeIntervalSinceNow
+        let minutes = Int(timeInterval / 60)
+        
+        if minutes < 2 {
+            return .red
+        } else if minutes < 5 {
+            return .orange
+        } else {
+            return .primary
+        }
+    }
+    
+    private var badgeColor: Color {
+        switch position {
+        case 1: return .green
+        case 2: return .blue
+        case 3: return .purple
+        default: return .gray
+        }
+    }
+    
+    private var trainColor: Color {
+        switch arrival.trainLine.uppercased() {
+        case "A", "C", "E":
+            return .blue
+        case "B", "D", "F", "M":
+            return .orange
+        case "G":
+            return .green
+        case "L":
+            return .gray
+        case "J", "Z":
+            return .brown
+        case "N", "Q", "R", "W":
+            return .yellow
+        case "1", "2", "3":
+            return .red
+        case "4", "5", "6":
+            return Color(red: 0, green: 0.5, blue: 0)
+        case "7":
+            return .purple
+        default:
+            return .gray
+        }
+    }
+}
+
+// MARK: - Data Models
+
+struct StationArrival: Identifiable {
+    let id = UUID()
+    let stopID: String
+    let stationName: String
+    let arrivals: [TrainArrivalInfo]
+}
+
+struct TrainArrivalInfo: Identifiable {
+    let id = UUID()
+    let trainLine: String
+    let direction: String
+    let arrivalTime: Date
+    let delay: Int?
+}
+
+// MARK: - Station Name Mapper
+
+struct StationNameMapper {
+    static func name(for stopID: String) -> String {
+        // Remove direction suffix (N/S) if present
+        let baseStopID = stopID.hasSuffix("N") || stopID.hasSuffix("S")
+            ? String(stopID.dropLast())
+            : stopID
+        
+        let mapping: [String: String] = [
+            // G Train
+            "G22": "Court Square",
+            "G24": "21 St-Van Alst",
+            "G26": "Greenpoint Ave",
+            "G28": "Nassau Ave",
+            "G29": "Metropolitan Ave",
+            "G30": "Broadway",
+            "G31": "Flushing Ave",
+            "G32": "Myrtle-Willoughby",
+            "G33": "Bedford-Nostrand",
+            "G34": "Classon Ave",
+            "G35": "Clinton-Washington",
+            "G36": "Fulton St",
+            
+            // L Train
+            "L01": "8th Ave",
+            "L02": "6th Ave",
+            "L03": "Union Sq-14th St",
+            "L05": "3rd Ave",
+            "L06": "1st Ave",
+            "L08": "Bedford Ave",
+            "L10": "Lorimer St",
+            "L11": "Graham Ave",
+            "L12": "Grand St",
+            "L13": "Montrose Ave",
+            "L14": "Morgan Ave",
+            "L15": "Jefferson St",
+            "L16": "DeKalb Ave",
+            "L17": "Myrtle-Wyckoff",
+            
+            // A Train (partial)
+            "A02": "Inwood-207 St",
+            "A03": "Dyckman St",
+            "A05": "190 St",
+            "A06": "181 St",
+            "A09": "175 St",
+            "A10": "168 St",
+            "A11": "163 St",
+            "A12": "155 St",
+            
+            // Add more as needed
+        ]
+        
+        return mapping[baseStopID] ?? baseStopID
+    }
+}
+
 // MARK: - Test Data Generator
 
 extension TestView {
@@ -429,3 +866,18 @@ extension TestView {
     return TestView()
         .environment(client)
 }
+#Preview("Station View") {
+    let client = TrainNetworkClient()
+    client.lastUpdated = Date()
+    
+    var testView = TestView()
+    // Manually set to station mode
+    let view = TestView()
+    
+    return view
+        .environment(client)
+        .onAppear {
+            // This would normally be populated by actual data
+        }
+}
+
