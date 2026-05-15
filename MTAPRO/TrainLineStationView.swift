@@ -30,7 +30,7 @@ struct TrainLineStationView: View {
                 ], spacing: 20) {
                     ForEach(gStations) { station in
                         NavigationLink {
-                            StationView()
+                            TrainArrivalBoardView(station: station.name)
                         } label: {
                             Text("\(station.name)")
                         }
@@ -42,6 +42,7 @@ struct TrainLineStationView: View {
                 }
                 .frame(maxWidth: .infinity,  maxHeight: .infinity)
             }
+            .padding()
         }
     }
 }
