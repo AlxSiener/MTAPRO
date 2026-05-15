@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct TrainArrivalBoardView: View {
-    
+    let station: String
     @State private var direction: String = "Uptown"
     
     let arrivals = [
@@ -26,12 +26,12 @@ struct TrainArrivalBoardView: View {
                 
                 
                 HStack {
-                    Text("34 St - Penn Station")
+                    Text(station)
                         .foregroundStyle(.green)
                         .font(.headline)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .glassEffect(.regular.tint(.secondary))
+                        .glassEffect()
                     Spacer()
                     
                     ZStack {
@@ -169,9 +169,6 @@ struct TrainArrivalBoardView: View {
 }
 
 #Preview {
-    TrainArrivalBoardView()
+    TrainArrivalBoardView(station: "times sq")
 }
 
-#Preview {
-    TrainArrivalBoardView()
-}
